@@ -7,9 +7,11 @@ const Courses = () => {
     const navigate = useNavigate();
     const [authorized, setAuthorized] = useState(false);
     const [courses, setCourses] = useState([]);
+    const [role, setRole] = useState('');
 
     useEffect(() => {
         const token = localStorage.getItem('token');
+        const userRole = localStorage.getItem('role');
 
         if (!token) {
             navigate('/');
@@ -17,6 +19,7 @@ const Courses = () => {
         }
 
         setAuthorized(true);
+        setRole(userRole);
     }, [navigate]);
 
     useEffect(() => {
@@ -40,11 +43,24 @@ const Courses = () => {
     const enrollCourse = async (courseId) => {
         try {
             await API.post(`/courses/${courseId}/enroll`);
+            await fetchCourses();
             alert('Enrolled successfully');
         } catch (error) {
             alert(
                 'Error enrolling in course: ' +
                     (error.response ? error.response.data.message : error.message)
+            );
+        }
+    };
+
+    const deleteCourse = async (courseId) => {
+        try{
+            await API.delete(`/courses/${courseId}`);
+            alert('Course deleted successfully');
+            fetchCourses();
+        }catch(err){
+            alert(
+                err.response? err.response.data.message : err.message
             );
         }
     };
@@ -63,6 +79,16 @@ const Courses = () => {
                     <p className="text-gray-500 mt-2">
                         Browse and enroll in available courses
                     </p>
+                    {
+                        role === 'admin' && (
+                            <button
+                                onClick={() => navigate('/create-course')}
+                                className="mt-4 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl cursor-pointer transition duration-300  font-semibold"
+                            >
+                                Create Course
+                            </button>
+                        )
+                    }
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -118,6 +144,7 @@ const Courses = () => {
                                 key={course._id}
                                 className="bg-white rounded-2xl shadow-md p-6"
                             >
+                                {console.log(course)}
                                 <h2 className="text-2xl font-bold mb-2">
                                     {course.courseName}
                                 </h2>
@@ -134,12 +161,48 @@ const Courses = () => {
                                     Credits: {course.credits}
                                 </p>
 
-                                <button
-                                    className="w-full bg-blue-500 hover:bg-blue-600 transition duration-300 text-white py-3 rounded-xl cursor-pointer"
-                                    onClick={() => enrollCourse(course._id)}
-                                >
-                                    Enroll
-                                </button>
+                                <p className="text-gray-600 mb-6">
+                                    Seats Left: {course.seatsAvailable}
+                                </p>
+
+                                {
+                                    role === 'student' && (
+
+                                        course.isEnrolled ? (
+
+                                            <div className="w-full bg-green-100 text-green-600 text-center py-3 rounded-xl font-semibold">
+                                                Already Enrolled
+                                            </div>
+
+                                        ) : course.isFull ? (
+
+                                            <div className="w-full bg-red-100 text-red-600 text-center py-3 rounded-xl font-semibold">
+                                                Course Full
+                                            </div>
+
+                                        ) : (
+
+                                            <button
+                                                className="w-full bg-blue-500 hover:bg-blue-600 transition duration-300 text-white py-3 rounded-xl cursor-pointer"
+                                                onClick={() => enrollCourse(course._id)}
+                                            >
+                                                Enroll
+                                            </button>
+
+                                        )
+                                    )
+                                }
+
+                                {
+                                    role === 'admin' && (
+                                        <button
+                                            className="w-full bg-red-500 hover:bg-red-600 transition duration-300 text-white py-3 rounded-xl cursor-pointer mt-3"
+                                            onClick={() => deleteCourse(course._id)}
+                                        >
+                                            Delete Course
+                                        </button>
+                                    )
+                                }
                             </div>
                         ))}
                     </div>

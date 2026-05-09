@@ -4,6 +4,9 @@ const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
 const courseRoutes = require('./src/routes/courseRoutes');
 const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
+
 
 dotenv.config();
 connectDB();

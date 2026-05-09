@@ -4,7 +4,24 @@ const getCourses = async (req, res) => {
 
     try{
         const courses = await Course.find();
-        res.status(200).json(courses);
+
+        const updatedCourses = courses.map(course => {
+            const isEnrolled = course.students && course.students.some(
+                studentId => studentId.toString() === req.user.id.toString()
+            );
+            const seatsAvailable = course.capacity-(course.students ? course.students.length : 0);
+            const isFull = course.students.length >= course.capacity;
+
+            return {
+                ...course.toObject(),
+                isEnrolled,
+                seatsAvailable,
+                isFull
+            };
+
+        });
+
+        res.status(200).json(updatedCourses);
     }
     catch(err){
         res.status(500).json({message: 'Server error while fetching courses'});
@@ -99,18 +116,35 @@ const deleteCourse = async (req, res) => {
 };
 
 const enrollCourse = async (req,res)=>{
+
+    let session;
     
     try{
-        const course = await Course.findById(req.params.id);
+
+        const mongoose = require('mongoose');
+        session = await mongoose.startSession();
+        session.startTransaction();
+
+        const course = await Course.findById(req.params.id).session(session);
         if(!course){
+            await session.abortTransaction();
+            await session.endSession();
             return res.status(404).json({message: 'Course not found'});
         }
 
-        if(course.students && course.students.includes(req.user.id)){
+        const alreadyEnrolled = course.students && course.students.some(
+            studentId => studentId.toString() === req.user.id.toString()
+        );
+
+        if(alreadyEnrolled){
+            await session.abortTransaction();
+            await session.endSession();
             return res.status(400).json({message: 'Already enrolled in this course'});
         }
 
         if(course.capacity && course.students && course.students.length >= course.capacity){
+            await session.abortTransaction();
+            await session.endSession();
             return res.status(400).json({message: 'Course is full'});
         }
 
@@ -119,10 +153,17 @@ const enrollCourse = async (req,res)=>{
         }
 
         course.students.push(req.user.id);
-        await course.save();
+        await course.save({session});
+
+        await session.commitTransaction(); 
+        await session.endSession();
 
         res.status(200).json({message: 'Enrolled in course successfully'});
     }catch(err){
+        if(session){
+            await session.abortTransaction();
+                        await session.endSession();
+        }
         res.status(500).json({message: 'Server error while enrolling in course'});
     }
 

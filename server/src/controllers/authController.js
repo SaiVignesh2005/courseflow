@@ -28,7 +28,7 @@ const login= async (req, res) => {
         }
     )
 
-    res.status(200).json({message: 'Login successful', token});
+    res.status(200).json({message: 'Login successful', token, role: user.role});
 };
 
 module.exports = {login};

@@ -14,6 +14,7 @@ const Login = () =>{
                 }
             );
             localStorage.setItem('token', response.data.token);
+            localStorage.setItem('role', response.data.role);
             window.location.href = '/courses';
             console.log(response.data);
         }

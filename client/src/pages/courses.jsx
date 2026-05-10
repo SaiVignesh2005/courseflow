@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../api/api';
 import Navbar from '../components/navbar.jsx';
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:5000');
 
 const Courses = () => {
     const navigate = useNavigate();
@@ -21,6 +24,25 @@ const Courses = () => {
         setAuthorized(true);
         setRole(userRole);
     }, [navigate]);
+
+    useEffect(() => {
+
+    socket.on('connect', () => {
+        console.log('Connected to Socket.IO server ' + socket.id);
+    });
+
+    socket.on('courseUpdated', async () => {
+        console.log('Course update received');
+        try{
+            const response = await API.get('/courses');
+            setCourses(response.data);
+        }
+        catch(err){
+            console.log(err);
+        }
+        });
+
+    }, []);
 
     useEffect(() => {
         if (authorized) {

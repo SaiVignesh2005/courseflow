@@ -59,6 +59,8 @@ const createCourse = async (req, res) => {
             department,
             credits
         });
+        const io = req.app.get('io');
+        io.emit('courseUpdated', course);
         res.status(201).json(course);
 
     }
@@ -86,6 +88,8 @@ const updateCourse = async (req, res) => {
             req.body,
             {new: true}
         );
+        const io = req.app.get('io');
+        io.emit('courseUpdated',updatedCourse);
         res.status(200).json(updatedCourse);
     }
 
@@ -104,6 +108,8 @@ const deleteCourse = async (req, res) => {
         }
 
         await Course.findByIdAndDelete(req.params.id);
+        const io = req.app.get('io');
+        io.emit('courseUpdated', course);
         res.status(200).json({message: 'Course deleted successfully'});
 
     }
@@ -156,6 +162,8 @@ const enrollCourse = async (req,res)=>{
         await course.save({session});
 
         await session.commitTransaction(); 
+        const io = req.app.get('io');
+        io.emit('courseUpdated', course);
         await session.endSession();
 
         res.status(200).json({message: 'Enrolled in course successfully'});
@@ -198,6 +206,8 @@ const dropCourse = async (req, res) => {
 
         course.students = course.students.filter(studentId => studentId.toString() !== req.user.id.toString());
         await course.save();
+        const io = req.app.get('io');
+        io.emit('courseUpdated', course);
         res.status(200).json({message: 'Dropped course successfully'});
     }
     catch(err){

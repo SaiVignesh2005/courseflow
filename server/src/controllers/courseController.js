@@ -1,22 +1,32 @@
 const Course = require('../models/Course');
 
-const getCourses = async (req, res) => {
+const getCourses = async (req, res, next) => {
 
     try{
         const courses = await Course.find();
 
-        const updatedCourses = courses.map(course => {
+        const filteredCourses = courses.filter(course => {
+            const allowedDepartments = course.allowedDepartments.length==0 || course.allowedDepartments.includes(req.user.department);
+            const allowedSemesters = course.allowedSemesters.length==0 || course.allowedSemesters.includes(req.user.semester);
+            return allowedDepartments && allowedSemesters;
+        });
+
+        const updatedCourses = filteredCourses.map(course => {
             const isEnrolled = course.students && course.students.some(
                 studentId => studentId.toString() === req.user.id.toString()
             );
             const seatsAvailable = course.capacity-(course.students ? course.students.length : 0);
             const isFull = course.students.length >= course.capacity;
+            const isWaitlisted = course.waitlist && course.waitlist.some(
+                studentId => studentId.toString() === req.user.id.toString()
+            );
 
             return {
                 ...course.toObject(),
                 isEnrolled,
                 seatsAvailable,
-                isFull
+                isFull,
+                isWaitlisted
             };
 
         });
@@ -24,32 +34,60 @@ const getCourses = async (req, res) => {
         res.status(200).json(updatedCourses);
     }
     catch(err){
-        res.status(500).json({message: 'Server error while fetching courses'});
+        next(err);
     }
 
 };
 
-const getCourseById = async (req, res) => {
+const getCourseById = async (req, res,next) => {
 
     try{
         const course = await Course.findById(req.params.id);
         if(!course){
-            return res.status(404).json({message: 'Course not found'});
+            const error = new Error('Course not found');
+            error.status = 404;
+            throw error;
         }
         res.status(200).json(course);
     }
     catch(err){
-        res.status(500).json({message: 'Server error while fetching course by ID'});
+        next(err);
     }
 
 };
 
-const createCourse = async (req, res) => {
+const createCourse = async (req, res, next) => {
+
     try{
-        const {courseCode, courseName, capacity, department, credits} = req.body;
-        const existingCourse = await Course.findOne({courseCode});
+
+        const {
+            courseCode,
+            courseName,
+            capacity,
+            department,
+            credits,
+            allowedDepartments,
+            allowedSemesters
+        } = req.body;
+
+        if(!courseCode || !courseName || capacity==null || !department || credits==null){
+
+            const error = new Error('All fields are required');
+
+            error.status = 400;
+
+            throw error;
+        }
+
+        const existingCourse = await Course.findOne({ courseCode });
+
         if(existingCourse){
-            return res.status(400).json({message: 'Course already exists'});
+
+            const error = new Error('Course already exists');
+
+            error.status = 400;
+
+            throw error;
         }
 
         const course = await Course.create({
@@ -59,30 +97,39 @@ const createCourse = async (req, res) => {
             department,
             credits
         });
+
         const io = req.app.get('io');
+
         io.emit('courseUpdated', course);
+
         res.status(201).json(course);
 
     }
+
     catch(err){
 
-    console.log(err);
+        next(err);
 
-    res.status(500).json({
-        message: 'Server error while creating course'
-    });
-
-}
+    }
 
 };
 
-const updateCourse = async (req, res) => {
+const updateCourse = async (req, res, next) => {
 
     try{
         const course = await Course.findById(req.params.id);
         if(!course){
-            return res.status(404).json({message: 'Course not found'});
+            const error = new Error('Course not found');
+            error.status = 404;
+            throw error;
         }
+
+        if(req.body.capacity!=null && req.body.capacity<1){
+            const error = new Error('Capacity must be positive');
+            error.status = 400;
+            throw error;
+        }
+
         const updatedCourse = await Course.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -94,17 +141,19 @@ const updateCourse = async (req, res) => {
     }
 
     catch(err){
-        res.status(500).json({message: 'Server error while updating course'});
+        next(err);
     }
 
 };
 
-const deleteCourse = async (req, res) => {
+const deleteCourse = async (req, res, next) => {
 
     try{
         const course = await Course.findById(req.params.id);
         if(!course){
-            return res.status(404).json({message: 'Course not found'});
+            const error = new Error('Course not found');
+            error.status = 404;
+            throw error;
         }
 
         await Course.findByIdAndDelete(req.params.id);
@@ -116,12 +165,12 @@ const deleteCourse = async (req, res) => {
 
 
     catch(err){
-        res.status(500).json({message: 'Server error while deleting course'});
+        next(err);
     }
 
 };
 
-const enrollCourse = async (req,res)=>{
+const enrollCourse = async (req,res,next)=>{
 
     let session;
     
@@ -135,7 +184,9 @@ const enrollCourse = async (req,res)=>{
         if(!course){
             await session.abortTransaction();
             await session.endSession();
-            return res.status(404).json({message: 'Course not found'});
+            const error = new Error('Course not found');
+            error.status = 404;
+            throw error;
         }
 
         const alreadyEnrolled = course.students && course.students.some(
@@ -145,13 +196,49 @@ const enrollCourse = async (req,res)=>{
         if(alreadyEnrolled){
             await session.abortTransaction();
             await session.endSession();
-            return res.status(400).json({message: 'Already enrolled in this course'});
+            const error = new Error('Already enrolled in this course');
+            error.status = 400;
+            throw error;
         }
 
+        
         if(course.capacity && course.students && course.students.length >= course.capacity){
-            await session.abortTransaction();
-            await session.endSession();
-            return res.status(400).json({message: 'Course is full'});
+
+            if(!course.waitlist){
+                course.waitlist = [];
+            }
+
+            const alreadyWaitlisted =
+                course.waitlist &&
+                course.waitlist.some(
+                    studentId => studentId.toString() === req.user.id.toString()
+                );
+
+            if(alreadyWaitlisted){
+
+                const error = new Error('Already in waitlist');
+
+                error.status = 400;
+
+                throw error;
+            }
+
+            course.waitlist.push(req.user.id);
+           
+
+
+            await course.save({ session });
+            const updated = await Course.findById(course._id);           
+
+            await session.commitTransaction();
+
+            const io = req.app.get('io');
+
+            io.emit('courseUpdated', course);
+
+            return res.status(200).json({
+                message: 'Added to waitlist'
+            });
         }
 
         if(!course.students){
@@ -168,30 +255,34 @@ const enrollCourse = async (req,res)=>{
 
         res.status(200).json({message: 'Enrolled in course successfully'});
     }catch(err){
-        if(session){
+        if(session?.inTransaction()){
             await session.abortTransaction();
-                        await session.endSession();
         }
-        res.status(500).json({message: 'Server error while enrolling in course'});
+        if(session){
+            await session.endSession();
+        }
+        next(err);
     }
 
 };
 
-const getEnrolledCourses = async (req, res) => {
+const getEnrolledCourses = async (req, res, next) => {
     try{
         const courses = await Course.find({students: req.user.id});
         res.status(200).json(courses);
     }
     catch(err){
-        res.status(500).json({message: 'Server error while fetching enrolled courses'});
+        next(err);
     }
 };
 
-const dropCourse = async (req, res) => {
+const dropCourse = async (req, res, next) => {
     try{
         const course = await Course.findById(req.params.id);
         if(!course){
-            return res.status(404).json({message: 'Course not found'});
+            const error = new Error('Course not found');
+            error.status = 404;
+            throw error;
         }
         
         const enrolled = course.students.some(
@@ -199,20 +290,52 @@ const dropCourse = async (req, res) => {
         );
 
         if(!enrolled){
-            return res.status(400).json({
-                message: 'Not enrolled in this course'
-            });
+            const error = new Error('Not enrolled in this course');
+            error.status = 400;
+            throw error;
         }
 
         course.students = course.students.filter(studentId => studentId.toString() !== req.user.id.toString());
+
+        if(course.waitlist && course.waitlist.length > 0){
+            const nextStudentId = course.waitlist.shift();
+            course.students.push(nextStudentId);
+        }
+
         await course.save();
         const io = req.app.get('io');
         io.emit('courseUpdated', course);
         res.status(200).json({message: 'Dropped course successfully'});
     }
     catch(err){
-        res.status(500).json({message: 'Server error while dropping course'});
-        console.log(err);
+        next(err);
+    }
+};
+
+const leaveWaitlist = async (req, res, next) => {
+    try{
+        const course = await Course.findById(req.params.id);
+        if(!course){
+            const error = new Error('Course not found');
+            error.status = 404;
+            throw error;
+        }
+        const isWaitlisted = course.waitlist && course.waitlist.some(
+            studentId => studentId.toString() === req.user.id.toString()
+        );
+        if(!isWaitlisted){
+            const error = new Error('Not in waitlist for this course');
+            error.status = 400;
+            throw error;
+        }
+        course.waitlist = course.waitlist.filter(studentId => studentId.toString() !== req.user.id.toString());
+        await course.save();
+        const io = req.app.get('io');
+        io.emit('courseUpdated', course);
+        res.status(200).json({message: 'Left waitlist successfully'});
+    }
+    catch(err){
+        next(err);
     }
 };
 
@@ -225,5 +348,6 @@ module.exports = {
     deleteCourse,
     getEnrolledCourses,
     dropCourse,
-    enrollCourse
+    enrollCourse,
+    leaveWaitlist
 }

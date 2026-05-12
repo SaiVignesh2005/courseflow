@@ -22,11 +22,26 @@ const CourseSchema = new mongoose.Schema(
         capacity : {
             type : Number,
             required : true
-        },students: {
+        },
+        allowedDepartments : {
+            type : [String],
+            default : []
+        },
+        allowedSemesters : {
+            type : [Number],
+            default : []
+        },
+        students: {
             type: [mongoose.Schema.Types.ObjectId],
             ref: 'User',
             default: []
-        }
+        },
+        waitlist : [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User'
+            }
+        ]
     },
     {
         timestamps : true

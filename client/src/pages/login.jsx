@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import toast from 'react-hot-toast';
 
 const Login = () =>{
 
@@ -15,11 +16,13 @@ const Login = () =>{
             );
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('role', response.data.role);
+            localStorage.setItem('loginSuccess', 'true');
             window.location.href = '/courses';
-            console.log(response.data);
+            toast.success('Login successful');
         }
         catch(error){
             console.error(error.response.data);
+            toast.error('Login failed');
         }
     }
 

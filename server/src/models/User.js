@@ -16,8 +16,9 @@ const UserSchema = new mongoose.Schema(
             type : String,
             enum : ['student', 'admin'],
             default : 'student'
-        }
-
+        },
+        department : String,
+        semester : Number,
     },
     {
         timestamps : true

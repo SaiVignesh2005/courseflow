@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import API from '../api/api';
 import Navbar from '../components/navbar.jsx';
 import { io } from 'socket.io-client';
+import toast from 'react-hot-toast';
 
 const socket = io('http://localhost:5000');
 
@@ -11,6 +12,7 @@ const Courses = () => {
     const [authorized, setAuthorized] = useState(false);
     const [courses, setCourses] = useState([]);
     const [role, setRole] = useState('');
+
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -27,22 +29,29 @@ const Courses = () => {
 
     useEffect(() => {
 
-    socket.on('connect', () => {
-        console.log('Connected to Socket.IO server ' + socket.id);
-    });
-
-    socket.on('courseUpdated', async () => {
-        console.log('Course update received');
-        try{
-            const response = await API.get('/courses');
-            setCourses(response.data);
-        }
-        catch(err){
-            console.log(err);
-        }
+        socket.on('connect', () => {
+            console.log('Connected to Socket.IO server ' + socket.id);
         });
 
+        socket.on('courseUpdated', async () => {
+            try{
+                const response = await API.get('/courses');
+                setCourses(response.data);
+            }
+            catch(err){
+                console.log(err);
+            }
+            });
+
     }, []);
+
+    useEffect(() => {
+        const loginSuccess= localStorage.getItem('loginSuccess');
+        if(loginSuccess){
+            toast.success('Login successful');
+            localStorage.removeItem('loginSuccess');
+        }
+    },[]);
 
     useEffect(() => {
         if (authorized) {
@@ -66,11 +75,23 @@ const Courses = () => {
         try {
             await API.post(`/courses/${courseId}/enroll`);
             await fetchCourses();
-            alert('Enrolled successfully');
+            toast.success('Enrollment successful');
         } catch (error) {
-            alert(
-                'Error enrolling in course: ' +
-                    (error.response ? error.response.data.message : error.message)
+            toast.error(
+                error.response ? error.response.data.message : error.message
+            );
+        }
+    };
+
+    const leaveWaitlist = async (courseId) => {
+        try{
+            const response = await API.delete(`/courses/${courseId}/leave-waitlist`);
+            await fetchCourses();
+            toast.success(response.data.message);
+        }
+        catch(err){
+            toast.error(
+                err.response? err.response.data.message : err.message
             );
         }
     };
@@ -78,10 +99,10 @@ const Courses = () => {
     const deleteCourse = async (courseId) => {
         try{
             await API.delete(`/courses/${courseId}`);
-            alert('Course deleted successfully');
+            toast.success('Course deleted successfully');
             fetchCourses();
         }catch(err){
-            alert(
+            toast.error(
                 err.response? err.response.data.message : err.message
             );
         }
@@ -164,10 +185,10 @@ const Courses = () => {
                         {courses.map((course) => (
                             <div
                                 key={course._id}
-                                className="bg-white rounded-2xl shadow-md p-6"
+                                className="bg-white rounded-2xl shadow-md p-6 hover:transition duration-300 hover:scale-105 hover:shadow-xl"
                             >
-                                {console.log(course)}
-                                <h2 className="text-2xl font-bold mb-2">
+                              
+                                <h2 className="text-2xl font-bold mb-2 min-h-[80px]">
                                     {course.courseName}
                                 </h2>
 
@@ -189,28 +210,24 @@ const Courses = () => {
 
                                 {
                                     role === 'student' && (
-
                                         course.isEnrolled ? (
-
                                             <div className="w-full bg-green-100 text-green-600 text-center py-3 rounded-xl font-semibold">
                                                 Already Enrolled
                                             </div>
-
-                                        ) : course.isFull ? (
-
-                                            <div className="w-full bg-red-100 text-red-600 text-center py-3 rounded-xl font-semibold">
-                                                Course Full
-                                            </div>
-
+                                        ) : course.isWaitlisted ? (
+                                                <button
+                                                    className="w-full bg-yellow-400 hover:bg-yellow-500 transition duration-300 text-white py-3 rounded-xl cursor-pointer"
+                                                    onClick={() => leaveWaitlist(course._id)}
+                                                >
+                                                    Leave Waitlist
+                                                </button>
                                         ) : (
-
                                             <button
                                                 className="w-full bg-blue-500 hover:bg-blue-600 transition duration-300 text-white py-3 rounded-xl cursor-pointer"
                                                 onClick={() => enrollCourse(course._id)}
                                             >
-                                                Enroll
+                                                {course.isFull ? 'Join Waitlist' : 'Enroll'}
                                             </button>
-
                                         )
                                     )
                                 }

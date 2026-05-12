@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const {getCourses, getCourseById, createCourse, updateCourse, deleteCourse,getEnrolledCourses,dropCourse,enrollCourse} = require('../controllers/courseController');
+const {getCourses, getCourseById, createCourse, updateCourse, deleteCourse,getEnrolledCourses,dropCourse,enrollCourse,leaveWaitlist} = require('../controllers/courseController');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 
@@ -15,7 +15,9 @@ router.post('/:id/enroll', authMiddleware, enrollCourse);
 router.put('/:id', authMiddleware,adminMiddleware, updateCourse);
 
 router.delete('/:id/drop', authMiddleware, dropCourse);
+router.delete('/:id/leave-waitlist', authMiddleware, leaveWaitlist);
 router.delete('/:id', authMiddleware,adminMiddleware, deleteCourse);
+
 
 
 module.exports = router;

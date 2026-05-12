@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import API from '../api/api';
 import Navbar from '../components/navbar';
 import {useNavigate} from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 const enrolledCourses = () =>{
 
@@ -36,10 +37,10 @@ const enrolledCourses = () =>{
     const dropCourse = async (courseId) => {
         try{
             const response = await API.delete(`/courses/${courseId}/drop`);
-            alert('Dropped course successfully');
+            toast.success(response.data.message);
             fetchEnrolledCourses();
         }catch(error){
-            alert('Error dropping course: ' + (error.response ? error.response.data.message : error.message));
+            toast.error('Error dropping course: ' + (error.response ? error.response.data.message : error.message));
         }
     };
 

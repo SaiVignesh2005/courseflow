@@ -14,7 +14,10 @@ connectDB();
 const app = express();
 app.use(express.json());
 
-app.use(cors());
+app.use(cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);
@@ -26,7 +29,7 @@ app.get('/', (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
     cors:{
-        origin: 'http://localhost:5173',
+        origin: process.env.CLIENT_URL || 'http://localhost:5173',
         methods: ['GET', 'POST']
     }
 });

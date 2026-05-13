@@ -1,6 +1,6 @@
 import { useState } from "react";
-import axios from "axios";
 import toast from 'react-hot-toast';
+import API from '../api/api';
 
 const Login = () =>{
 
@@ -8,7 +8,7 @@ const Login = () =>{
     const [password, setPassword] = useState('');
     const handleLogin = async () => {
         try{
-            const response = await axios.post('http://localhost:5000/api/auth/login', 
+            const response = await API.post('/auth/login', 
                 {
                     rollNumber,
                     password

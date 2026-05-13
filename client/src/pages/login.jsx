@@ -8,7 +8,7 @@ const Login = () =>{
     const [password, setPassword] = useState('');
     const handleLogin = async () => {
         try{
-            const response = await API.post('/auth/login', 
+            const response = await API.post('auth/login', 
                 {
                     rollNumber,
                     password

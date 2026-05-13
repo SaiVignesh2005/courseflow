@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import Login from './pages/login';
-import Courses from './pages/Courses';
-import EnrolledCourses from './pages/EnrolledCourses';
-import CreateCourse from './pages/CreateCourse';
+import Courses from './pages/courses';
+import EnrolledCourses from './pages/enrolledCourses';
+import CreateCourse from './pages/createCourse';
 
 
 function App() {
